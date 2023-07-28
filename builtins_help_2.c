@@ -12,6 +12,7 @@ void help_history(void);
 void help_env(void)
 {
 	char *msg = "env: env\n\tPrints the current environment.\n";
+
 	write(STDOUT_FILENO, msg, _strlen(msg));
 }
 
