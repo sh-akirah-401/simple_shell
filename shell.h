@@ -3,8 +3,8 @@
 
 /*
  * File: shell.h
- * Auth: sh-akirah-401
- *       Ojay16
+ * Auth: Alex Yu
+ *       Brennan D Baraban
  */
 
 #include <fcntl.h>
@@ -23,9 +23,9 @@
 /* Global environemnt */
 extern char **environ;
 /* Global program name */
-char
+char *name;
 /* Global history counter */
-int
+int hist;
 
 /**
  * struct list_s - A new struct type defining a linked list.
