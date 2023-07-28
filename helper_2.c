@@ -1,151 +1,186 @@
 #include "shell.h"
 
-void free_args(char **args, char **front);
-char *get_pid(void);
-char *get_env_value(char *beginning, int len);
-void variable_replacement(char **args, int *exe_ret);
+void handle_line(char **line, ssize_t read);
+ssize_t get_new_len(char *line);
+void logical_ops(char *line, ssize_t *new_len);
 
 /**
- * free_args - Frees memory taken from args.
- * @args: A null-terminated double pointer.
- * @front: A double pointer at the beginning of args.
- */
-void free_args(char **args, char **front)
-{
-	size_t o;
-
-	for (o = 0; args[o] || args[o + 1]; o++)
-		free(args[o]);
-
-	free(front);
-}
-
-/**
- * get_pid - Gets the current ID.
- * Description: Opens the stat file, The PID is the
- *              first word in the file. The function reads the PID into
- *              a buffer and replace the space at the end with a \0 byte.
+ * handle_line - Partitions a line read from standard input as needed.
+ * @line: A pointer to a line read fromy the input.
+ * @read: length of line.
  *
- * Return: The current process ID OR NULL if it fails.
+ * Description: Spaces are inserted to separate ";", "||", and "&&".
+ *              Replaces "#" with '\0'.
  */
-char *get_pid(void)
+void handle_line(char **line, ssize_t read)
 {
-	size_t o = 0;
-	char *buffer;
-	ssize_t file;
+	char *old_line, *new_line;
+	char previous, current, next;
+	size_t i, j;
+	ssize_t new_len;
 
-	file = open("/proc/self/stat", O_RDONLY);
-	if (file == -1)
-	{
-		perror("Cant read file");
-		return (NULL);
-	}
-	buffer = malloc(120);
-	if (!buffer)
-	{
-		close(file);
-		return (NULL);
-	}
-	read(file, buffer, 120);
-	while (buffer[o] != ' ')
-		o++;
-	buffer[o] = '\0';
-
-	close(file);
-	return (buffer);
-}
-
-/**
- * get_env_value - Gets the value corresponding to the environmental variable.
- * @beginning: The environmental variable to be searched.
- * @len: The length of the environmental variable to be searched.
- * Return: An empty string if variable is not found.
- * OR - the value of the environmental variable.
- * Description: Variables are stored in VARIABLE=VALUE format.
- */
-char *get_env_value(char *beginning, int len)
-{
-	char **var_addr;
-	char *replacement = NULL, *temp, *var;
-
-	var = malloc(len + 1);
-	if (!var)
-		return (NULL);
-	var[0] = '\0';
-	_strncat(var, beginning, len);
-
-	var_addr = _getenv(var);
-	free(var);
-	if (var_addr)
-	{
-		temp = *var_addr;
-		while (*temp != '=')
-			temp++;
-		temp++;
-		replacement = malloc(_strlen(temp) + 1);
-		if (replacement)
-			_strcpy(replacement, temp);
-	}
-
-	return (replacement);
-}
-
-/**
- * variable_replacement - Handles variable replacement.
- * @line: A double pointer containing the command and arguments.
- * @exe_ret: A pointer to the return value of the last executed command.
- *
- * Description: Replaces $$ with the current PID with the return value
- *              of the last executed program, and envrionmental variables
- *              preceded by $ with their corresponding value.
- */
-void variable_replacement(char **line, int *exe_ret)
-{
-	int j, k = 0, len;
-	char *replacement = NULL, *old_line = NULL, *new_line;
-
+	new_len = get_new_len(*line);
+	if (new_len == read - 1)
+		return;
+	new_line = malloc(new_len + 1);
+	if (!new_line)
+		return;
+	j = 0;
 	old_line = *line;
-	for (j = 0; old_line[j]; j++)
+	for (i = 0; old_line[i]; i++)
 	{
-		if (old_line[j] == '$' && old_line[j + 1] &&
-				old_line[j + 1] != ' ')
+		current = old_line[i];
+		next = old_line[i + 1];
+		if (i != 0)
 		{
-			if (old_line[j + 1] == '$')
+			previous = old_line[i - 1];
+			if (current == ';')
 			{
-				replacement = get_pid();
-				k = j + 2;
+				if (next == ';' && previous != ' ' && previous != ';')
+				{
+					new_line[j++] = ' ';
+					new_line[j++] = ';';
+					continue;
+				}
+				else if (previous == ';' && next != ' ')
+				{
+					new_line[j++] = ';';
+					new_line[j++] = ' ';
+					continue;
+				}
+				if (previous != ' ')
+					new_line[j++] = ' ';
+				new_line[j++] = ';';
+				if (next != ' ')
+					new_line[j++] = ' ';
+				continue;
 			}
-			else if (old_line[j + 1] == '?')
+			else if (current == '&')
 			{
-				replacement = _itoa(*exe_ret);
-				k = j + 2;
+				if (next == '&' && previous != ' ')
+					new_line[j++] = ' ';
+				else if (previous == '&' && next != ' ')
+				{
+					new_line[j++] = '&';
+					new_line[j++] = ' ';
+					continue;
+				}
 			}
-			else if (old_line[j + 1])
+			else if (current == '|')
 			{
-				for (k = j + 1; old_line[k] &&
-						old_line[k] != '$' &&
-						old_line[k] != ' '; k++)
-					;
-				len = k - (j + 1);
-				replacement = get_env_value(&old_line[j + 1], len);
+				if (next == '|' && previous != ' ')
+					new_line[j++]  = ' ';
+				else if (previous == '|' && next != ' ')
+				{
+					new_line[j++] = '|';
+					new_line[j++] = ' ';
+					continue;
+				}
 			}
-			new_line = malloc(j + _strlen(replacement)
-					  + _strlen(&old_line[k]) + 1);
-			if (!line)
-				return;
-			new_line[0] = '\0';
-			_strncat(new_line, old_line, j);
-			if (replacement)
-			{
-				_strcat(new_line, replacement);
-				free(replacement);
-				replacement = NULL;
-			}
-			_strcat(new_line, &old_line[k]);
-			free(old_line);
-			*line = new_line;
-			old_line = new_line;
-			j = -1;
 		}
+		else if (current == ';')
+		{
+			if (i != 0 && old_line[i - 1] != ' ')
+				new_line[j++] = ' ';
+			new_line[j++] = ';';
+			if (next != ' ' && next != ';')
+				new_line[j++] = ' ';
+			continue;
+		}
+		new_line[j++] = old_line[i];
+	}
+	new_line[j] = '\0';
+
+	free(*line);
+	*line = new_line;
+}
+
+/**
+ * get_new_len - Gets the new length of a line partitioned
+ *               by ";", "||", "&&&", or "#".
+ * @line: Line to check.
+ *
+ * Return: New length of the line.
+ *
+ * Description: Cuts short lines containing '#' comments with '\0'.
+ */
+
+ssize_t get_new_len(char *line)
+{
+	size_t i;
+	ssize_t new_len = 0;
+	char current, next;
+
+	for (i = 0; line[i]; i++)
+	{
+		current = line[i];
+		next = line[i + 1];
+		if (current == '#')
+		{
+			if (i == 0 || line[i - 1] == ' ')
+			{
+				line[i] = '\0';
+				break;
+			}
+		}
+		else if (i != 0)
+		{
+			if (current == ';')
+			{
+				if (next == ';' && line[i - 1] != ' ' && line[i - 1] != ';')
+				{
+					new_len += 2;
+					continue;
+				}
+				else if (line[i - 1] == ';' && next != ' ')
+				{
+					new_len += 2;
+					continue;
+				}
+				if (line[i - 1] != ' ')
+					new_len++;
+				if (next != ' ')
+					new_len++;
+			}
+			else
+				logical_ops(&line[i], &new_len);
+		}
+		else if (current == ';')
+		{
+			if (i != 0 && line[i - 1] != ' ')
+				new_len++;
+			if (next != ' ' && next != ';')
+				new_len++;
+		}
+		new_len++;
+	}
+	return (new_len);
+}
+/**
+ * logical_ops - Checks a line for logical operators "||" or "&&".
+ * @line: A pointer to the character to check the line.
+ * @new_len: Pointer to new_len in get_new_len function.
+ */
+void logical_ops(char *line, ssize_t *new_len)
+{
+	char previous, current, next;
+
+	previous = *(line - 1);
+	current = *line;
+	next = *(line + 1);
+
+	if (current == '&')
+	{
+		if (next == '&' && previous != ' ')
+			(*new_len)++;
+		else if (previous == '&' && next != ' ')
+			(*new_len)++;
+	}
+	else if (current == '|')
+	{
+		if (next == '|' && previous != ' ')
+			(*new_len)++;
+		else if (previous == '|' && next != ' ')
+			(*new_len)++;
 	}
 }

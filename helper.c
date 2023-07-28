@@ -6,31 +6,32 @@ char *get_env_value(char *beginning, int len);
 void variable_replacement(char **args, int *exe_ret);
 
 /**
- * free_args - Frees memory taken by the args.
- * @args: A null-terminated double pointer.
- * @front: A double pointer at the beginning of args.
+ * free_args - Frees up memory taken.
+ * @args: A null-terminated pointer containing commands.
+ * @front: A double pointer at the start of the args.
  */
 void free_args(char **args, char **front)
 {
-	size_t o;
+	size_t i;
 
-	for (o = 0; args[o] || args[o + 1]; o++)
-		free(args[o]);
+	for (i = 0; args[i] || args[i + 1]; i++)
+		free(args[i]);
 
 	free(front);
 }
 
 /**
  * get_pid - Gets the current ID.
- * Description: Opens the stat file. The PID is the,
- * first word in the file. The function reads the PID into
- * a buffer and replace the space at the end with a \0 byte
- * Return: The current process ID OR NULL if it fails.
+ * Description: Opens the stat file, a space-delimited file containing
+ *              information about the current process. The PID is the
+ *              first word in the file. The function reads the PID into
+ *              a buffer then replaces the space at the end with a \0 byte.
+ *
+ * Return: The current process ID OR NULL on failure.
  */
-
 char *get_pid(void)
 {
-	size_t o = 0;
+	size_t i = 0;
 	char *buffer;
 	ssize_t file;
 
@@ -47,21 +48,23 @@ char *get_pid(void)
 		return (NULL);
 	}
 	read(file, buffer, 120);
-	while (buffer[o] != ' ')
-		o++;
-	buffer[o] = '\0';
+	while (buffer[i] != ' ')
+		i++;
+	buffer[i] = '\0';
 
 	close(file);
 	return (buffer);
 }
 
 /**
- * get_env_value - Gets the value corresponding to the environmental variable.
- * @beginning: The environmental variable to be searched.
- * @len: The length of the environmental variable to be searched.
- * Return: An empty string if variable is not found.
- * OR - the value of the environmental variable.
- * Description: Variables are stored in VARIABLE=VALUE format.
+ * get_env_value - Gets the value corresponding to an environmental variable.
+ * @beginning: The environmental variable to search for.
+ * @len: The length of the environmental variable to search for.
+ *
+ * Return: If the variable is not found - an empty string.
+ *         OR - the value of the environmental variable.
+ *
+ * Description: Variables are stored in the format VARIABLE=VALUE.
  */
 char *get_env_value(char *beginning, int len)
 {
@@ -94,9 +97,10 @@ char *get_env_value(char *beginning, int len)
  * variable_replacement - Handles variable replacement.
  * @line: A double pointer containing the command and arguments.
  * @exe_ret: A pointer to the return value of the last executed command.
- * Description: Replaces $$ with the current PID with the return value
- * of the last executed program, and envrionmental variable
- * preceded by $ with their corresponding value.
+ *
+ * Description: Replaces $$ with the current PID, $? with the return value
+ *              of the last executed program, and envrionmental variables
+ *              preceded by $ with their corresponding value.
  */
 void variable_replacement(char **line, int *exe_ret)
 {
@@ -121,6 +125,7 @@ void variable_replacement(char **line, int *exe_ret)
 			}
 			else if (old_line[j + 1])
 			{
+				/* extract the variable name to check for */
 				for (k = j + 1; old_line[k] &&
 						old_line[k] != '$' &&
 						old_line[k] != ' '; k++)
